@@ -24,10 +24,12 @@ class Activity(db.Model, SerializerMixin):
     name = db.Column(db.String)
     difficulty = db.Column(db.Integer)
 
-    # Add relationship
+    # Add relationship with Signup model
+    signups = db.relationship('Signup', cascade='all,delete', backref='activity')
     
-    # Add serialization rules
-    
+    # Add serialization rules to exclude certian fields when serializing
+    serialize_rules = ('-signups.activity',)
+
     def __repr__(self):
         return f'<Activity {self.id}: {self.name}>'
 
@@ -39,12 +41,30 @@ class Camper(db.Model, SerializerMixin):
     name = db.Column(db.String, nullable=False)
     age = db.Column(db.Integer)
 
-    # Add relationship
+    # Add relationship with Signup model
+    signups = db.relationship('Signup', backref='camper')
+
+    # use association_proxy to create a proxy for accessign activities through signups
+    activities = association_proxy('signups', 'activity')
+
+    # Add serialization rules for serialization to avoid circular reference
+    serialize_rules = ('-signups.camper', '-activities.signups')
+
+    # Add validation for the name field
+    @validates('name')
+    def validate_name(self, key, name):
+        print('Inside the name validation')
+        if not name or len(name) < 1:
+            raise ValueError('Name must exist')
+        return name
     
-    # Add serialization rules
-    
-    # Add validation
-    
+    @validates('age')    
+    def validate_age(self, key, age):
+        print('Inside the age validation')
+        if not 8 <= age <=18:
+            print('Invalid age!')
+            raise ValueError('Age must be 8 to 18')
+        return age
     
     def __repr__(self):
         return f'<Camper {self.id}: {self.name}>'
@@ -57,10 +77,19 @@ class Signup(db.Model, SerializerMixin):
     time = db.Column(db.Integer)
 
     # Add relationships
-    
+    # Foregn keys to reference Camper and Activity models
+    camper_id = db.Column(db.Integer, db.ForeignKey('campers.id'))
+    activity_id = db.Column(db.Integer, db.ForeignKey('activities.id'))
+
     # Add serialization rules
-    
+    serialize_rules = ('-camper.signups', '-activity.signups')
+
     # Add validation
+    @validates('time')
+    def validate_time(self, key, time):
+        if not 0 <= time <= 23:
+            raise ValueError('Time must be within limits')
+        return time
     
     def __repr__(self):
         return f'<Signup {self.id}>'
